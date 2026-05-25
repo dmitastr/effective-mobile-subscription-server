@@ -3,6 +3,7 @@ module effective-mobile-subscription-server
 go 1.25.5
 
 require (
+	github.com/avast/retry-go/v5 v5.0.0
 	github.com/gin-contrib/gzip v0.0.6
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-migrate/migrate/v4 v4.19.1

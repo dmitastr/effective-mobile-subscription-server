@@ -15,7 +15,22 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5"
+
+	"github.com/avast/retry-go/v5"
 )
+
+// RetriableError is a custom error that contains a positive duration for the next retry
+type RetriableError struct {
+	Err        error
+	RetryAfter time.Duration
+}
+
+// Error returns error message and a Retry-After duration
+func (e *RetriableError) Error() string {
+	return fmt.Sprintf("%s (retry after %v)", e.Err.Error(), e.RetryAfter)
+}
+
+var _ error = (*RetriableError)(nil)
 
 type IDatasource interface {
 	AddSubscription(ctx context.Context, subscription *models.Subscription) error
@@ -38,7 +53,28 @@ func NewDatasource(ctx context.Context, dsn string, log *logrus.Logger) (IDataso
 		return nil, fmt.Errorf("failed to parse database config: %w", err)
 	}
 
-	pool, err := pgxpool.NewWithConfig(ctx, dbConfig)
+	var pool *pgxpool.Pool
+	err = retry.New(
+		retry.DelayType(func(n uint, err error, config retry.DelayContext) time.Duration {
+			log.WithError(err).Error("Server fails with: ")
+			if retriable, ok := err.(*RetriableError); ok {
+				log.WithField("retry-after", retriable.RetryAfter.String()).Info("Server retry in: ")
+				return retriable.RetryAfter
+			}
+			// apply a default exponential back off strategy
+			return retry.BackOffDelay(n, err, config)
+		}),
+	).Do(
+		func() error {
+			var err error
+			pool, err = pgxpool.NewWithConfig(ctx, dbConfig)
+			if err != nil {
+				return err
+			}
+			return nil
+		},
+	)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database connection pool: %w", err)
 	}
