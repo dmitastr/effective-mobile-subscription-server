@@ -10,7 +10,7 @@ import (
 	"effective-mobile-subscription-server/internal/mapper"
 	"effective-mobile-subscription-server/internal/presentation/objects"
 	"github.com/gin-gonic/gin"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 type IHandler interface {
@@ -23,10 +23,11 @@ type IHandler interface {
 
 type Handler struct {
 	service subService.IService
+	logger  *logrus.Logger
 }
 
-func NewHandler(service subService.IService) IHandler {
-	return &Handler{service: service}
+func NewHandler(service subService.IService, log *logrus.Logger) IHandler {
+	return &Handler{service: service, logger: log}
 }
 
 // AddSubscription godoc
@@ -42,19 +43,19 @@ func NewHandler(service subService.IService) IHandler {
 func (h Handler) AddSubscription(c *gin.Context) {
 	var request objects.AddSubscriptionRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		log.WithError(err).Error("failed to parse request body")
+		h.logger.WithError(err).Error("failed to parse request body")
 
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.WithFields(log.Fields{
+	h.logger.WithFields(logrus.Fields{
 		"subscription": request,
 	}).Info("add subscription request")
 
 	subscription, err := mapper.ToModel(request.Subscription)
 	if err != nil {
-		log.WithError(err).WithFields(log.Fields{
+		h.logger.WithError(err).WithFields(logrus.Fields{
 			"subscription": request,
 		}).Error("failed to convert to model")
 
@@ -64,7 +65,7 @@ func (h Handler) AddSubscription(c *gin.Context) {
 
 	if err := h.service.AddSubscription(c, subscription); err != nil {
 
-		log.WithError(err).WithFields(log.Fields{
+		h.logger.WithError(err).WithFields(logrus.Fields{
 			"subscriptionModel": subscription,
 		}).Error("failed to add subscription")
 
@@ -72,7 +73,7 @@ func (h Handler) AddSubscription(c *gin.Context) {
 		return
 	}
 
-	log.WithFields(log.Fields{
+	h.logger.WithFields(logrus.Fields{
 		"subscriptionModel": subscription,
 	}).Info("subscription added successfully")
 
@@ -94,7 +95,7 @@ func (h Handler) GetSubscription(c *gin.Context) {
 	userID := c.Query("user_id")
 	subName := c.Query("subscription_name")
 
-	log.WithFields(log.Fields{
+	h.logger.WithFields(logrus.Fields{
 		"user_id":           userID,
 		"subscription_name": subName,
 	}).Info("get subscription request")
@@ -102,7 +103,7 @@ func (h Handler) GetSubscription(c *gin.Context) {
 	var subs []models.Subscription
 	var err error
 	if userID == "" && subName == "" {
-		log.Warn("get subscription: missing user_id and subscription_name")
+		h.logger.Warn("get subscription: missing user_id and subscription_name")
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing user_id or subscription_name"})
 		return
 	} else if userID != "" {
@@ -112,7 +113,7 @@ func (h Handler) GetSubscription(c *gin.Context) {
 	}
 
 	if err != nil {
-		log.WithError(err).WithFields(log.Fields{
+		h.logger.WithError(err).WithFields(logrus.Fields{
 			"user_id":           userID,
 			"subscription_name": subName,
 		}).Error("failed to get subscriptions")
@@ -120,7 +121,7 @@ func (h Handler) GetSubscription(c *gin.Context) {
 		return
 	}
 
-	log.WithFields(log.Fields{
+	h.logger.WithFields(logrus.Fields{
 		"user_id":           userID,
 		"subscription_name": subName,
 		"count":             len(subs),
@@ -143,19 +144,19 @@ func (h Handler) GetSubscription(c *gin.Context) {
 func (h Handler) UpdateSubscription(c *gin.Context) {
 	subID := c.Param("id")
 
-	log.WithFields(log.Fields{
+	h.logger.WithFields(logrus.Fields{
 		"subscriptionID": subID,
 	}).Info("update subscription request")
 
 	if subID == "" {
-		log.Warn("update subscription: missing subscription ID")
+		h.logger.Warn("update subscription: missing subscription ID")
 
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing subscription id"})
 		return
 	}
 	var request objects.AddSubscriptionRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		log.WithError(err).WithFields(log.Fields{
+		h.logger.WithError(err).WithFields(logrus.Fields{
 			"subscription": request,
 		}).Error("update subscription: failed to parse request body")
 
@@ -165,7 +166,7 @@ func (h Handler) UpdateSubscription(c *gin.Context) {
 
 	id, err := strconv.Atoi(subID)
 	if err != nil {
-		log.WithError(err).WithFields(log.Fields{
+		h.logger.WithError(err).WithFields(logrus.Fields{
 			"subscriptionID": subID,
 		}).Error("update subscription: invalid subscription ID")
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -175,7 +176,7 @@ func (h Handler) UpdateSubscription(c *gin.Context) {
 
 	subscription, err := mapper.ToModel(request.Subscription)
 	if err != nil {
-		log.WithError(err).WithFields(log.Fields{
+		h.logger.WithError(err).WithFields(logrus.Fields{
 			"subscription": request,
 		}).Error("update subscription: failed to convert to model")
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -183,14 +184,14 @@ func (h Handler) UpdateSubscription(c *gin.Context) {
 	}
 
 	if err := h.service.UpdateSubscription(c, subscription); err != nil {
-		log.WithError(err).WithFields(log.Fields{
+		h.logger.WithError(err).WithFields(logrus.Fields{
 			"subscriptionModel": subscription,
 		}).Error("update subscription: failed to update subscription")
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.WithFields(log.Fields{
+	h.logger.WithFields(logrus.Fields{
 		"subscriptionModel": subscription,
 	}).Info("subscription updated successfully")
 
@@ -210,11 +211,11 @@ func (h Handler) UpdateSubscription(c *gin.Context) {
 func (h Handler) DeleteSubscription(c *gin.Context) {
 	subID := c.Param("id")
 
-	log.WithField("subscription_id", subID).
+	h.logger.WithField("subscription_id", subID).
 		Info("delete subscription request")
 
 	if subID == "" {
-		log.Warn("delete subscription: missing subscription id")
+		h.logger.Warn("delete subscription: missing subscription id")
 
 		c.AbortWithStatusJSON(http.StatusBadRequest,
 			gin.H{"error": "missing subscription id"})
@@ -223,7 +224,7 @@ func (h Handler) DeleteSubscription(c *gin.Context) {
 
 	id, err := strconv.Atoi(subID)
 	if err != nil {
-		log.WithError(err).WithField("subscription_id", subID).
+		h.logger.WithError(err).WithField("subscription_id", subID).
 			Warn("delete subscription: invalid subscription id")
 
 		c.AbortWithStatusJSON(http.StatusBadRequest,
@@ -232,7 +233,7 @@ func (h Handler) DeleteSubscription(c *gin.Context) {
 	}
 
 	if err := h.service.DeleteSubscription(c, id); err != nil {
-		log.WithError(err).WithField("subscription_id", id).
+		h.logger.WithError(err).WithField("subscription_id", id).
 			Error("failed to delete subscription")
 
 		c.AbortWithStatusJSON(http.StatusInternalServerError,
@@ -240,7 +241,7 @@ func (h Handler) DeleteSubscription(c *gin.Context) {
 		return
 	}
 
-	log.WithField("subscription_id", id).
+	h.logger.WithField("subscription_id", id).
 		Info("subscription deleted")
 
 	c.JSON(http.StatusOK, objects.DeleteSubscriptionResponse{})
@@ -265,7 +266,7 @@ func (h Handler) GetSubscriptionAggregate(c *gin.Context) {
 	from := c.Query("from_date")
 	to := c.Query("to_date")
 
-	log.WithFields(log.Fields{
+	h.logger.WithFields(logrus.Fields{
 		"user_id":      userID,
 		"subscription": subName,
 		"from_date":    from,
@@ -273,7 +274,7 @@ func (h Handler) GetSubscriptionAggregate(c *gin.Context) {
 	}).Info("get subscription aggregate request")
 
 	if userID == "" || subName == "" || from == "" || to == "" {
-		log.Warn("get subscription aggregate: missing required query parameters")
+		h.logger.Warn("get subscription aggregate: missing required query parameters")
 
 		c.AbortWithStatusJSON(http.StatusBadRequest,
 			gin.H{"error": "missing user_id or subscription id or from/to date"})
@@ -292,7 +293,7 @@ func (h Handler) GetSubscriptionAggregate(c *gin.Context) {
 	}
 
 	if errDates != "" {
-		log.WithFields(log.Fields{
+		h.logger.WithFields(logrus.Fields{
 			"user_id":      userID,
 			"subscription": subName,
 			"from_date":    from,
@@ -312,7 +313,7 @@ func (h Handler) GetSubscriptionAggregate(c *gin.Context) {
 		toDate,
 	)
 	if err != nil {
-		log.WithError(err).WithFields(log.Fields{
+		h.logger.WithError(err).WithFields(logrus.Fields{
 			"user_id":      userID,
 			"subscription": subName,
 			"from_date":    from,
@@ -324,7 +325,7 @@ func (h Handler) GetSubscriptionAggregate(c *gin.Context) {
 		return
 	}
 
-	log.WithFields(log.Fields{
+	h.logger.WithFields(logrus.Fields{
 		"user_id":      userID,
 		"subscription": subName,
 		"sum":          sum,

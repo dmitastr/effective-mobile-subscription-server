@@ -38,7 +38,7 @@ func NewApp(ctx context.Context, cfg *config.Config, logger *logrus.Logger) (*Ap
 	}
 
 	subService := service.NewService(db, logger)
-	handler := handlers.NewHandler(subService)
+	handler := handlers.NewHandler(subService, logger)
 	router := gin.Default()
 	registerHandlers(router, handler)
 
