@@ -251,7 +251,7 @@ func (h Handler) DeleteSubscription(c *gin.Context) {
 // @Description get sum of specified subscriptions for a user in certain period
 // @Tags subscription
 // @Produce json
-// @Param user_id query string true "user id"
+// @Param user_id query string true "user id in uuid format"
 // @Param subscription query string true "subscription name"
 // @Param from_date query string true "Min starting date of subscription (YYYY-MM-DD)"	format(date) example(2025-08-02)
 // @Param to_date query string true	  "Min starting date of subscription (YYYY-MM-DD)"	format(date) example(2025-08-02)

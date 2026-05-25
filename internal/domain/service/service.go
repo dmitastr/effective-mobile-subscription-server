@@ -108,7 +108,7 @@ func (s Service) UpdateSubscription(ctx context.Context, sub *models.Subscriptio
 		"id":      sub.ID,
 		"user_id": sub.UserID,
 		"name":    sub.ServiceName,
-	}).Info("UpdateSubscription called")
+	}).Debug("UpdateSubscription called")
 
 	subs, err := s.db.GetSubscriptionByID(ctx, sub.ID)
 	if err != nil {
@@ -135,7 +135,8 @@ func (s Service) DeleteSubscription(ctx context.Context, subID int) error {
 	}
 	if len(subs) != 1 {
 		s.log.WithField("id", subID).Error("failed to find subscriptions by id")
-		return fmt.Errorf("GetSubscriptionByID error: %w", err)
+
+		return ErrNotFoundById
 	}
 
 	if err := s.db.DeleteSubscription(ctx, subID); err != nil {
